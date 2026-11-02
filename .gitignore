@@ -1,0 +1,23 @@
+# Python 编译缓存（每台机器都会重新生成，不提交）
+__pycache__/
+*.pyc
+
+# 虚拟环境（用 requirements.txt 重建，几百 MB 不提交）
+.venv/
+venv/
+
+# 密钥 / 环境变量 —— 安全红线，绝不提交
+.env
+
+# 运行产物
+trace.json
+*.log
+
+# 测试 / 类型检查缓存
+.pytest_cache/
+.mypy_cache/
+
+# 编辑器 / 系统文件（按需，可选）
+.idea/
+.vscode/
+.DS_Store

@@ -1,0 +1,34 @@
+services:
+  db:
+    image: pgvector/pgvector:pg18
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: sqlagent
+    ports:
+      - "5433:5432"   # 宿主机 5433 → 容器内 5432（给本机调试用）
+    volumes:
+      - pgdata:/var/lib/postgresql
+      # 首次启动时自动执行 seed.sql：建表 + 灌测试数据
+      - ./seed.sql:/docker-entrypoint-initdb.d/seed.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d sqlagent"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  api:
+    build: .          # 用同目录的 Dockerfile 构建
+    environment:
+      # 关键：容器里连 db 用「服务名 db:5432」，不是 localhost:5433
+      DATABASE_URL: postgresql://postgres:postgres@db:5432/sqlagent
+      # 从宿主机环境变量（或 .env 文件）读 key，不写死在镜像里
+      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy   # 等 db「真正就绪」，不是只等容器启动
+
+volumes:
+  pgdata:
