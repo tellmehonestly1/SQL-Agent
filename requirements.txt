@@ -3,3 +3,9 @@ uvicorn[standard]
 openai
 psycopg[binary]
 pydantic
+langchain-core
+langchain-openai
+langgraph
+langchain-postgres
+langchain-huggingface
+sentence-transformers

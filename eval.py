@@ -1,17 +1,18 @@
-"""评测：检查 agent 的结果里是否包含「正确答案」。
+"""评测（v2）：检查 agent 结果里是否包含「正确答案」。
 
-为什么不用「结果集完全相等」：agent 经常返回比标准答案更多的列
-（比如额外带上 name、order_count），这些「对但更详细」的答案不该被判错。
-所以改成：期望的关键值，是否都出现在 agent 的结果里。
+判定方法同 v1：execution accuracy + 「关键值包含」，避免「对但多列」被判错。
+区别：v1 从 agent.trace.events 取 SQL；v2 从 LangGraph 的最终 messages 里取
+所有 run_sql 的 tool_call 参数。
 
-运行方式：在 sql_agent 目录下，设好 DEEPSEEK_API_KEY，执行
-    python eval.py
+运行：设好 DEEPSEEK_API_KEY，先 python -m rag.ingest 建索引，再 python eval.py
 """
-import asyncio
+import json
 from decimal import Decimal
 
+from langchain_core.messages import AIMessage, HumanMessage
+
 from db import execute_raw
-from main import build_agent, build_system_prompt
+from graph.graph import build_graph
 
 
 EVAL_CASES = [
@@ -24,7 +25,6 @@ EVAL_CASES = [
 
 
 def _norm(v):
-    # 把 Decimal 转成 float，方便和 expected 里的数字比较
     return float(v) if isinstance(v, Decimal) else v
 
 
@@ -33,23 +33,39 @@ def values_of(sql: str) -> set:
     return {_norm(v) for row in execute_raw(sql) for v in row}
 
 
-async def run_eval() -> None:
+def _sqls_of(result: dict) -> list[str]:
+    """从 graph 最终消息里，提取所有 run_sql 工具调用的 SQL。"""
+    sqls = []
+    for m in result["messages"]:
+        if isinstance(m, AIMessage) and m.tool_calls:
+            for tc in m.tool_calls:
+                if isinstance(tc, dict):  # 新版 langchain-core 里 tool_calls 是 dict
+                    name, args = tc.get("name"), tc.get("args")
+                    if isinstance(args, str):
+                        args = json.loads(args)
+                else:  # 旧版是 ToolCall 对象
+                    name, args = getattr(tc, "name", None), getattr(tc, "args", {})
+                if name == "run_sql" and args:
+                    sqls.append(args["sql"])
+    return sqls
+
+
+def run_eval() -> None:
+    graph = build_graph()
     passed = 0
     for case in EVAL_CASES:
-        agent = build_agent()
-        await agent.run(case["question"], system_prompt=build_system_prompt())
-
-        # 收集 agent 执行过的【所有】run_sql 的结果值（多步 agent 会查多次）
-        steps = [t for t in agent.trace.events if t.get("type") == "tool" and t.get("tool") == "run_sql"]
-        if not steps:
+        result = graph.invoke(
+            {"question": case["question"], "context": "", "messages": [HumanMessage(case["question"])]}
+        )
+        sqls = _sqls_of(result)
+        if not sqls:
             print(f"[FAIL] {case['id']}  没有调用 run_sql：{case['question']}")
             continue
 
         all_values: set = set()
-        for t in steps:
-            all_values |= values_of(t["arguments"]["sql"])
+        for sql in sqls:
+            all_values |= values_of(sql)
 
-        # 关键值出现在任何一步的结果里 → 对
         if case["expected"].issubset(all_values):
             passed += 1
             print(f"[PASS] {case['id']}  {case['question']}")
@@ -62,4 +78,4 @@ async def run_eval() -> None:
 
 
 if __name__ == "__main__":
-    asyncio.run(run_eval())
+    run_eval()

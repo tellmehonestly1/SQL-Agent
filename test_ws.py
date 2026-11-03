@@ -19,15 +19,27 @@ async def main() -> None:
     async with websockets.connect(WS_URL) as ws:
         await ws.send(json.dumps({"question": "用户总数是多少"}))
         print("已发送问题，等待流式返回...\n")
+
+        answer = ""  # 最后一轮 agent 节点的 content 就是最终答案
         while True:
             msg = json.loads(await ws.recv())
-            t = msg.get("type")
-            if t == "llm":
-                print(f"  [llm] 模型决策，要调用工具: {msg.get('tool_calls')}")
-            elif t == "tool":
-                print(f"  [tool] 执行 {msg.get('tool')}，耗时 {msg.get('latency_ms')}ms")
-            elif t in ("done", "cancelled"):
-                print(f"\n  [{t}] {msg.get('answer', '')}")
+            node = msg.get("node")
+
+            if node == "retrieve":
+                print(f"  [retrieve] 检索上下文: {msg.get('detail', '')[:80]}...")
+            elif node == "agent":
+                calls = msg.get("tool_calls") or []
+                if calls:
+                    print(f"  [agent] 模型决策，要调用工具: {calls}")
+                if msg.get("detail"):
+                    answer = msg["detail"]
+            elif node == "tools":
+                print(f"  [tools] 工具返回: {msg.get('detail', '')[:80]}...")
+            elif node == "done":
+                print(f"\n  [done] 最终答案: {answer}")
+                break
+            elif node == "cancelled":
+                print("\n  [cancelled] 已取消")
                 break
 
 

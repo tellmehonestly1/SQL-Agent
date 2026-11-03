@@ -10,7 +10,7 @@ MCP 就是把这件事标准化——写成标准 server，任何支持 MCP 的�
 from mcp.server.mcpserver import MCPServer
 
 from db import run_sql as _run_sql
-from main import FORBIDDEN_SQL_KEYWORDS
+from tools import FORBIDDEN_SQL_KEYWORDS
 
 mcp = MCPServer("sql-agent")
 

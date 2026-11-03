@@ -25,6 +25,8 @@ def get_connection():
     # 把「只读 + 超时」钉在连接层，任何走这个连接的代码都无法绕过
     return psycopg.connect(
         dsn,
+        # 连接层超时：连不上（比如数据库容器没起）就 5 秒报错，而不是无限挂起
+        connect_timeout=5,
         options=(
             "-c default_transaction_read_only=on "
             f"-c statement_timeout={STATEMENT_TIMEOUT_MS}"

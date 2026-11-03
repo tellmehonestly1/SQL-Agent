@@ -1,3 +1,6 @@
+-- v2.0 RAG：pgvector 扩展，用来存 schema 语义的向量
+CREATE EXTENSION IF NOT EXISTS vector;
+
 CREATE TABLE users (
     id SERIAL PRIMARY KEY,
     name TEXT NOT NULL,
