@@ -73,7 +73,7 @@ python main.py
 uvicorn api:app --reload
 ```
 
-> **embedding 模型**：首次跑 `rag.ingest` 需要 `bge-small-zh-v1.5`（约 100MB）。国内建议先用镜像下载：`set HF_ENDPOINT=https://hf-mirror.com`，再跑一次让它缓存到本地。代码里默认 `local_files_only=True`（离线加载，避免连 huggingface.co 卡死），所以**模型必须先缓存好**。
+> **embedding 模型**：默认离线加载 `bge-small-zh-v1.5`（模型需先缓存到本地）。首次使用请 `set HF_LOCAL_FILES_ONLY=0` 并配 `set HF_ENDPOINT=https://hf-mirror.com` 走镜像下载一次；之后无需设置即可离线加载。
 >
 > **Docker 里跑 RAG**：api 容器做检索时同样要加载 embedding 模型，需把宿主机 `~/.cache/huggingface` 挂进容器；否则建议「db 放容器、API 本机跑」，这样共用宿主机已有的模型缓存。
 
