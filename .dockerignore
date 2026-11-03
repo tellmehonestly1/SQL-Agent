@@ -1,5 +1,12 @@
-__pycache__/
-*.pyc
-trace.json
-.git/
-.venv/
+.git
+.venv
+venv
+__pycache__
+.pytest_cache
+.hf-cache
+.env
+*.log
+eval-results*.json
+benchmark-results*.json
+
+.data

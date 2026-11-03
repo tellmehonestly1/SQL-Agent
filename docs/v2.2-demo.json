@@ -1,0 +1,679 @@
+{
+  "model": "deterministic test double; NOT a real model accuracy result",
+  "database": "isolated PostgreSQL fixture",
+  "turns": [
+    {
+      "episode": "revenue_clarify_and_rank",
+      "request": {
+        "question": "销售额是多少"
+      },
+      "response": {
+        "status": "clarification_required",
+        "answer": "请补充：请确认业务口径；订单金额不等同于已支付收入，活跃用户也需要行为定义。；请确认时间范围，或提供左闭右开的 date_range。",
+        "clarification": [
+          {
+            "field": "metric_id",
+            "message": "请确认业务口径；订单金额不等同于已支付收入，活跃用户也需要行为定义。",
+            "options": [
+              "order_amount",
+              "order_count",
+              "ordering_users"
+            ]
+          },
+          {
+            "field": "period",
+            "message": "请确认时间范围，或提供左闭右开的 date_range。",
+            "options": [
+              "all_time",
+              "last_month",
+              "this_month",
+              "last_7_days"
+            ]
+          }
+        ],
+        "trace": []
+      }
+    },
+    {
+      "episode": "revenue_clarify_and_rank",
+      "request": {
+        "question": "按订单金额，统计2026年1月",
+        "metric_id": "order_amount",
+        "date_range": {
+          "start": "2026-01-01",
+          "end": "2026-02-01"
+        }
+      },
+      "response": {
+        "status": "completed",
+        "answer": "查询结果：\n_col_0=160.40 [q1:r0:c0]",
+        "data": {
+          "columns": [
+            "_col_0"
+          ],
+          "rows": [
+            [
+              "160.40"
+            ]
+          ],
+          "truncated": false
+        },
+        "sources": [
+          {
+            "query_id": "q1",
+            "sql": "SELECT SUM(\"orders\".\"amount\") AS \"_col_0\" FROM \"orders\" AS \"orders\" WHERE \"orders\".\"created_at\" >= '2026-01-01T00:00:00+08:00' AND \"orders\".\"created_at\" < '2026-02-01T00:00:00+08:00'",
+            "queried_at": "2026-11-03T16:55:23.385935+00:00",
+            "result_digest": "f3f9db9c6498b7e22a65b866cc88ed919e5baea3fc623a25cec613958532fd6a",
+            "row_count": 1
+          }
+        ],
+        "citations": [
+          {
+            "id": "q1:r0:c0",
+            "query_id": "q1",
+            "row": 0,
+            "column": 0,
+            "value": "160.40"
+          }
+        ],
+        "semantics": {
+          "registry_version": "2.2.0",
+          "metric_id": "order_amount",
+          "metric": {
+            "name": "订单金额",
+            "expression": "SUM(orders.amount)",
+            "unit": "元",
+            "definition": "全部订单的记录金额，不等同于已支付收入；当前无支付、退款、状态字段。",
+            "time_column": "orders.created_at"
+          },
+          "date_range": {
+            "start": "2026-01-01",
+            "end": "2026-02-01"
+          },
+          "period": "custom",
+          "timezone": "Asia/Shanghai",
+          "resolved_on": "2026-11-04"
+        },
+        "answer_mode": "database_rendered",
+        "trace": [
+          {
+            "node": "retrieve",
+            "elapsed_ms": 0.55,
+            "context_chars": 0
+          },
+          {
+            "node": "agent",
+            "elapsed_ms": 0.14,
+            "tokens": 0
+          },
+          {
+            "node": "tools",
+            "elapsed_ms": 34.65,
+            "calls": 1,
+            "repairs": 0
+          },
+          {
+            "node": "agent",
+            "elapsed_ms": 2.51,
+            "tokens": 0
+          }
+        ]
+      }
+    },
+    {
+      "episode": "revenue_clarify_and_rank",
+      "request": {
+        "question": "按用户ID排名，金额降序，同金额按用户ID升序"
+      },
+      "response": {
+        "status": "completed",
+        "answer": "查询结果：\nuser_id=1 [q1:r0:c0]；total=99.90 [q1:r0:c1]\nuser_id=2 [q1:r1:c0]；total=30.50 [q1:r1:c1]\nuser_id=6 [q1:r2:c0]；total=20.00 [q1:r2:c1]\nuser_id=5 [q1:r3:c0]；total=10.00 [q1:r3:c1]",
+        "data": {
+          "columns": [
+            "user_id",
+            "total"
+          ],
+          "rows": [
+            [
+              1,
+              "99.90"
+            ],
+            [
+              2,
+              "30.50"
+            ],
+            [
+              6,
+              "20.00"
+            ],
+            [
+              5,
+              "10.00"
+            ]
+          ],
+          "truncated": false
+        },
+        "sources": [
+          {
+            "query_id": "q1",
+            "sql": "SELECT \"orders\".\"user_id\" AS \"user_id\", SUM(\"orders\".\"amount\") AS \"total\" FROM \"orders\" AS \"orders\" WHERE \"orders\".\"created_at\" >= '2026-01-01T00:00:00+08:00' AND \"orders\".\"created_at\" < '2026-02-01T00:00:00+08:00' GROUP BY \"orders\".\"user_id\" ORDER BY \"total\" DESC, \"user_id\"",
+            "queried_at": "2026-11-03T16:55:23.468115+00:00",
+            "result_digest": "b20537fe138e2d50bde448087146c3787987c2fbacf50b124f0d5082e76c7439",
+            "row_count": 4
+          }
+        ],
+        "citations": [
+          {
+            "id": "q1:r0:c0",
+            "query_id": "q1",
+            "row": 0,
+            "column": 0,
+            "value": 1
+          },
+          {
+            "id": "q1:r0:c1",
+            "query_id": "q1",
+            "row": 0,
+            "column": 1,
+            "value": "99.90"
+          },
+          {
+            "id": "q1:r1:c0",
+            "query_id": "q1",
+            "row": 1,
+            "column": 0,
+            "value": 2
+          },
+          {
+            "id": "q1:r1:c1",
+            "query_id": "q1",
+            "row": 1,
+            "column": 1,
+            "value": "30.50"
+          },
+          {
+            "id": "q1:r2:c0",
+            "query_id": "q1",
+            "row": 2,
+            "column": 0,
+            "value": 6
+          },
+          {
+            "id": "q1:r2:c1",
+            "query_id": "q1",
+            "row": 2,
+            "column": 1,
+            "value": "20.00"
+          },
+          {
+            "id": "q1:r3:c0",
+            "query_id": "q1",
+            "row": 3,
+            "column": 0,
+            "value": 5
+          },
+          {
+            "id": "q1:r3:c1",
+            "query_id": "q1",
+            "row": 3,
+            "column": 1,
+            "value": "10.00"
+          }
+        ],
+        "semantics": {
+          "registry_version": "2.2.0",
+          "metric_id": "order_amount",
+          "metric": {
+            "name": "订单金额",
+            "expression": "SUM(orders.amount)",
+            "unit": "元",
+            "definition": "全部订单的记录金额，不等同于已支付收入；当前无支付、退款、状态字段。",
+            "time_column": "orders.created_at"
+          },
+          "date_range": {
+            "start": "2026-01-01",
+            "end": "2026-02-01"
+          },
+          "period": "custom",
+          "timezone": "Asia/Shanghai",
+          "resolved_on": "2026-11-04"
+        },
+        "answer_mode": "database_rendered",
+        "trace": [
+          {
+            "node": "retrieve",
+            "elapsed_ms": 0.58,
+            "context_chars": 0
+          },
+          {
+            "node": "agent",
+            "elapsed_ms": 0.16,
+            "tokens": 0
+          },
+          {
+            "node": "tools",
+            "elapsed_ms": 12.65,
+            "calls": 1,
+            "repairs": 0
+          },
+          {
+            "node": "agent",
+            "elapsed_ms": 4.8,
+            "tokens": 0
+          }
+        ]
+      }
+    },
+    {
+      "episode": "unsupported_paid_revenue",
+      "request": {
+        "question": "已支付收入是多少"
+      },
+      "response": {
+        "status": "clarification_required",
+        "answer": "请补充：当前数据没有支付、退款、状态或登录字段，请改选可计算的口径。；请确认时间范围，或提供左闭右开的 date_range。",
+        "clarification": [
+          {
+            "field": "metric_id",
+            "message": "当前数据没有支付、退款、状态或登录字段，请改选可计算的口径。",
+            "options": [
+              "order_amount",
+              "order_count",
+              "ordering_users"
+            ]
+          },
+          {
+            "field": "period",
+            "message": "请确认时间范围，或提供左闭右开的 date_range。",
+            "options": [
+              "all_time",
+              "last_month",
+              "this_month",
+              "last_7_days"
+            ]
+          }
+        ],
+        "trace": []
+      }
+    },
+    {
+      "episode": "unsupported_paid_revenue",
+      "request": {
+        "question": "改用订单金额，全部时间",
+        "metric_id": "order_amount",
+        "period": "all_time"
+      },
+      "response": {
+        "status": "completed",
+        "answer": "查询结果：\n_col_0=599.20 [q1:r0:c0]",
+        "data": {
+          "columns": [
+            "_col_0"
+          ],
+          "rows": [
+            [
+              "599.20"
+            ]
+          ],
+          "truncated": false
+        },
+        "sources": [
+          {
+            "query_id": "q1",
+            "sql": "SELECT SUM(\"orders\".\"amount\") AS \"_col_0\" FROM \"orders\" AS \"orders\"",
+            "queried_at": "2026-11-03T16:55:23.574949+00:00",
+            "result_digest": "b1e40db5b398c06a70401d6a0114aa3eaa0aa816ac0f25272dc020d38e091167",
+            "row_count": 1
+          }
+        ],
+        "citations": [
+          {
+            "id": "q1:r0:c0",
+            "query_id": "q1",
+            "row": 0,
+            "column": 0,
+            "value": "599.20"
+          }
+        ],
+        "semantics": {
+          "registry_version": "2.2.0",
+          "metric_id": "order_amount",
+          "metric": {
+            "name": "订单金额",
+            "expression": "SUM(orders.amount)",
+            "unit": "元",
+            "definition": "全部订单的记录金额，不等同于已支付收入；当前无支付、退款、状态字段。",
+            "time_column": "orders.created_at"
+          },
+          "date_range": null,
+          "period": "all_time",
+          "timezone": "Asia/Shanghai",
+          "resolved_on": "2026-11-04"
+        },
+        "answer_mode": "database_rendered",
+        "trace": [
+          {
+            "node": "retrieve",
+            "elapsed_ms": 0.38,
+            "context_chars": 0
+          },
+          {
+            "node": "agent",
+            "elapsed_ms": 0.15,
+            "tokens": 0
+          },
+          {
+            "node": "tools",
+            "elapsed_ms": 10.44,
+            "calls": 1,
+            "repairs": 0
+          },
+          {
+            "node": "agent",
+            "elapsed_ms": 1.68,
+            "tokens": 0
+          }
+        ]
+      }
+    },
+    {
+      "episode": "active_definition",
+      "request": {
+        "question": "最近活跃用户有多少"
+      },
+      "response": {
+        "status": "clarification_required",
+        "answer": "请补充：请确认业务口径；订单金额不等同于已支付收入，活跃用户也需要行为定义。；请确认时间范围，或提供左闭右开的 date_range。",
+        "clarification": [
+          {
+            "field": "metric_id",
+            "message": "请确认业务口径；订单金额不等同于已支付收入，活跃用户也需要行为定义。",
+            "options": [
+              "order_amount",
+              "order_count",
+              "ordering_users"
+            ]
+          },
+          {
+            "field": "period",
+            "message": "请确认时间范围，或提供左闭右开的 date_range。",
+            "options": [
+              "all_time",
+              "last_month",
+              "this_month",
+              "last_7_days"
+            ]
+          }
+        ],
+        "trace": []
+      }
+    },
+    {
+      "episode": "active_definition",
+      "request": {
+        "question": "按下单用户，统计2026年1月",
+        "metric_id": "ordering_users",
+        "date_range": {
+          "start": "2026-01-01",
+          "end": "2026-02-01"
+        }
+      },
+      "response": {
+        "status": "completed",
+        "answer": "查询结果：\n_col_0=4 [q1:r0:c0]",
+        "data": {
+          "columns": [
+            "_col_0"
+          ],
+          "rows": [
+            [
+              4
+            ]
+          ],
+          "truncated": false
+        },
+        "sources": [
+          {
+            "query_id": "q1",
+            "sql": "SELECT COUNT(DISTINCT \"orders\".\"user_id\") AS \"_col_0\" FROM \"orders\" AS \"orders\" WHERE \"orders\".\"created_at\" >= '2026-01-01T00:00:00+08:00' AND \"orders\".\"created_at\" < '2026-02-01T00:00:00+08:00'",
+            "queried_at": "2026-11-03T16:55:23.663590+00:00",
+            "result_digest": "cdc0ef82677e2770f73b1b72b0a65cce99c969639e9a4914b7fe9dfdbf095c53",
+            "row_count": 1
+          }
+        ],
+        "citations": [
+          {
+            "id": "q1:r0:c0",
+            "query_id": "q1",
+            "row": 0,
+            "column": 0,
+            "value": 4
+          }
+        ],
+        "semantics": {
+          "registry_version": "2.2.0",
+          "metric_id": "ordering_users",
+          "metric": {
+            "name": "下单用户数",
+            "expression": "COUNT(DISTINCT orders.user_id)",
+            "unit": "人",
+            "definition": "有订单的去重用户数；不等同于登录或访问活跃人数。",
+            "time_column": "orders.created_at"
+          },
+          "date_range": {
+            "start": "2026-01-01",
+            "end": "2026-02-01"
+          },
+          "period": "custom",
+          "timezone": "Asia/Shanghai",
+          "resolved_on": "2026-11-04"
+        },
+        "answer_mode": "database_rendered",
+        "trace": [
+          {
+            "node": "retrieve",
+            "elapsed_ms": 0.34,
+            "context_chars": 0
+          },
+          {
+            "node": "agent",
+            "elapsed_ms": 0.13,
+            "tokens": 0
+          },
+          {
+            "node": "tools",
+            "elapsed_ms": 10.38,
+            "calls": 1,
+            "repairs": 0
+          },
+          {
+            "node": "agent",
+            "elapsed_ms": 1.9,
+            "tokens": 0
+          }
+        ]
+      }
+    },
+    {
+      "episode": "change_user_time_scope",
+      "request": {
+        "question": "用户总数是多少"
+      },
+      "response": {
+        "status": "completed",
+        "answer": "查询结果：\n_col_0=6 [q1:r0:c0]",
+        "data": {
+          "columns": [
+            "_col_0"
+          ],
+          "rows": [
+            [
+              6
+            ]
+          ],
+          "truncated": false
+        },
+        "sources": [
+          {
+            "query_id": "q1",
+            "sql": "SELECT COUNT(*) AS \"_col_0\" FROM \"users\" AS \"users\"",
+            "queried_at": "2026-11-03T16:55:23.720886+00:00",
+            "result_digest": "6e826cb352ac10329775028413305c1f31b18f070d94c308040acd02b85be7b7",
+            "row_count": 1
+          }
+        ],
+        "citations": [
+          {
+            "id": "q1:r0:c0",
+            "query_id": "q1",
+            "row": 0,
+            "column": 0,
+            "value": 6
+          }
+        ],
+        "semantics": {
+          "registry_version": "2.2.0",
+          "metric_id": "user_count",
+          "metric": {
+            "name": "用户数量",
+            "expression": "COUNT(users.id)",
+            "unit": "人",
+            "definition": "用户记录数量；时间条件按用户创建时间。",
+            "time_column": "users.created_at"
+          },
+          "date_range": null,
+          "period": "all_time",
+          "timezone": "Asia/Shanghai",
+          "resolved_on": "2026-11-04"
+        },
+        "answer_mode": "database_rendered",
+        "trace": [
+          {
+            "node": "retrieve",
+            "elapsed_ms": 0.31,
+            "context_chars": 0
+          },
+          {
+            "node": "agent",
+            "elapsed_ms": 0.13,
+            "tokens": 0
+          },
+          {
+            "node": "tools",
+            "elapsed_ms": 8.54,
+            "calls": 1,
+            "repairs": 0
+          },
+          {
+            "node": "agent",
+            "elapsed_ms": 1.23,
+            "tokens": 0
+          }
+        ]
+      }
+    },
+    {
+      "episode": "change_user_time_scope",
+      "request": {
+        "question": "只看2026年2月创建的用户",
+        "date_range": {
+          "start": "2026-02-01",
+          "end": "2026-03-01"
+        }
+      },
+      "response": {
+        "status": "completed",
+        "answer": "查询结果：\n_col_0=0 [q1:r0:c0]",
+        "data": {
+          "columns": [
+            "_col_0"
+          ],
+          "rows": [
+            [
+              0
+            ]
+          ],
+          "truncated": false
+        },
+        "sources": [
+          {
+            "query_id": "q1",
+            "sql": "SELECT COUNT(*) AS \"_col_0\" FROM \"users\" AS \"users\" WHERE \"users\".\"created_at\" >= '2026-02-01T00:00:00+08:00' AND \"users\".\"created_at\" < '2026-03-01T00:00:00+08:00'",
+            "queried_at": "2026-11-03T16:55:23.771382+00:00",
+            "result_digest": "5fe208e0bb28d937a9441cc50f0acf7c084b8af9acefb938b79c83d7a0bbd370",
+            "row_count": 1
+          }
+        ],
+        "citations": [
+          {
+            "id": "q1:r0:c0",
+            "query_id": "q1",
+            "row": 0,
+            "column": 0,
+            "value": 0
+          }
+        ],
+        "semantics": {
+          "registry_version": "2.2.0",
+          "metric_id": "user_count",
+          "metric": {
+            "name": "用户数量",
+            "expression": "COUNT(users.id)",
+            "unit": "人",
+            "definition": "用户记录数量；时间条件按用户创建时间。",
+            "time_column": "users.created_at"
+          },
+          "date_range": {
+            "start": "2026-02-01",
+            "end": "2026-03-01"
+          },
+          "period": "custom",
+          "timezone": "Asia/Shanghai",
+          "resolved_on": "2026-11-04"
+        },
+        "answer_mode": "database_rendered",
+        "trace": [
+          {
+            "node": "retrieve",
+            "elapsed_ms": 0.28,
+            "context_chars": 0
+          },
+          {
+            "node": "agent",
+            "elapsed_ms": 0.11,
+            "tokens": 0
+          },
+          {
+            "node": "tools",
+            "elapsed_ms": 9.73,
+            "calls": 1,
+            "repairs": 0
+          },
+          {
+            "node": "agent",
+            "elapsed_ms": 1.78,
+            "tokens": 0
+          }
+        ]
+      }
+    },
+    {
+      "episode": "followup_without_context",
+      "request": {
+        "question": "只看上个月"
+      },
+      "response": {
+        "status": "clarification_required",
+        "answer": "请补充：没有可延续的查询，请先说明要查询的指标或数据。",
+        "clarification": [
+          {
+            "field": "question",
+            "message": "没有可延续的查询，请先说明要查询的指标或数据。",
+            "options": []
+          }
+        ],
+        "trace": []
+      }
+    }
+  ]
+}

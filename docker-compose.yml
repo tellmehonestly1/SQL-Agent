@@ -10,7 +10,8 @@ services:
     volumes:
       - pgdata:/var/lib/postgresql
       # 首次启动时自动执行 seed.sql：建表 + 灌测试数据
-      - ./seed.sql:/docker-entrypoint-initdb.d/seed.sql
+      - ./seed.sql:/docker-entrypoint-initdb.d/01-seed.sql
+      - ./db_init/reader.sql:/docker-entrypoint-initdb.d/02-reader.sql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres -d sqlagent"]
       interval: 5s
@@ -21,9 +22,18 @@ services:
     build: .          # 用同目录的 Dockerfile 构建
     environment:
       # 关键：容器里连 db 用「服务名 db:5432」，不是 localhost:5433
-      DATABASE_URL: postgresql://postgres:postgres@db:5432/sqlagent
+      INDEX_DATABASE_URL: postgresql://postgres:postgres@db:5432/sqlagent
+      QUERY_DATABASE_URL: postgresql://sqlagent_reader:sqlagent_reader@db:5432/sqlagent
       # 从宿主机环境变量（或 .env 文件）读 key，不写死在镜像里
       DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
+      API_CLIENT_KEYS: ${API_CLIENT_KEYS:-}
+      SESSION_DATABASE_PATH: /app/.data/sessions.sqlite
+      SESSION_TTL_SECONDS: ${SESSION_TTL_SECONDS:-1800}
+      MAX_SESSIONS: ${MAX_SESSIONS:-1000}
+      MAX_HISTORY_TURNS: ${MAX_HISTORY_TURNS:-8}
+    volumes:
+      - ${HF_CACHE_DIR:-./.hf-cache}:/root/.cache/huggingface
+      - sessions:/app/.data
     ports:
       - "8000:8000"
     depends_on:
@@ -32,3 +42,4 @@ services:
 
 volumes:
   pgdata:
+  sessions:

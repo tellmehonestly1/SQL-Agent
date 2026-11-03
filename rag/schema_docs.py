@@ -48,18 +48,25 @@ STATIC_DOCS: list[dict[str, str]] = [
 ]
 
 
-def build_schema_documents(schema_text: str) -> list[dict[str, str]]:
-    """拼出最终要向量化的文档列表 = 业务语义 + 动态结构。
-
-    schema_text 来自 db.get_schema()（从 information_schema 动态读，永远最新）。
-    这样既有人工补充的业务语义，又不会漏掉任何一张表的结构。
-    """
-    docs = list(STATIC_DOCS)
-    docs.append(
-        {
-            "id": "raw-schema",
-            "title": "数据库原始结构",
-            "content": "当前数据库的表结构如下：\n" + schema_text,
-        }
-    )
+def build_schema_documents(schema_text: str) -> list[dict]:
+    """One structural document per table, with stable identity and join metadata."""
+    docs = []
+    for item in STATIC_DOCS:
+        doc = dict(item)
+        doc["tables"] = (
+            ["users", "orders"] if item["id"].startswith("order-") else [item["id"]]
+        )
+        docs.append(doc)
+    for line in schema_text.splitlines():
+        table = line.removeprefix("- ").split("(", 1)[0]
+        if not table:
+            continue
+        docs.append(
+            {
+                "id": f"schema:{table}",
+                "title": f"{table} schema",
+                "content": line,
+                "tables": [table],
+            }
+        )
     return docs

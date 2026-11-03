@@ -10,11 +10,14 @@
 
 需要首次下载模型时：设 HF_LOCAL_FILES_ONLY=0（配合 HF_ENDPOINT=https://hf-mirror.com 走镜像）。
 """
+
 import os
+from functools import lru_cache
 
 from langchain_huggingface import HuggingFaceEmbeddings
 
 
+@lru_cache(maxsize=1)
 def build_embeddings() -> HuggingFaceEmbeddings:
     local_files_only = os.environ.get("HF_LOCAL_FILES_ONLY", "1") != "0"
     return HuggingFaceEmbeddings(

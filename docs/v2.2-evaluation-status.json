@@ -1,0 +1,16 @@
+{
+  "version": "2.2.0",
+  "checked_on": "2026-11-04",
+  "timezone": "Asia/Shanghai",
+  "real_model_evaluation": "not_run",
+  "reason": "DEEPSEEK_API_KEY is absent and project .env does not exist",
+  "single_turn_cases": 30,
+  "conversation_episodes": 5,
+  "conversation_turns": 10,
+  "accuracy": null,
+  "latency_improvement": null,
+  "commands": [
+    "python eval.py --mode all",
+    "python eval_conversations.py --mode hybrid"
+  ]
+}

@@ -1,0 +1,30 @@
+name: regression
+on: [push, pull_request]
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: pgvector/pgvector:pg18
+        env:
+          POSTGRES_PASSWORD: sqlagent_test
+          POSTGRES_DB: sqlagent
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d sqlagent"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      SQLAGENT_TEST_ADMIN_DSN: postgresql://postgres:sqlagent_test@localhost:5432/sqlagent
+      SQLAGENT_TEST_READER_DSN: postgresql://sqlagent_reader:sqlagent_reader@localhost:5432/sqlagent
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+      - run: pip install -r requirements-dev.txt
+      - run: python -m ruff check --select E9,F .
+      - run: python -m pytest -q

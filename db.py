@@ -1,101 +1,221 @@
-"""数据库访问层：只读、超时、行数上限，全部在这里兜底。
+"""Bounded structured queries with shared policy, pooling and async cancellation."""
 
-防御纵深（4 层，任何一层失效还有下一层）：
-1. 只读事务：default_transaction_read_only=on，数据库自己拒绝写
-2. 超时：statement_timeout，防止 pg_sleep 之类拖死连接
-3. 行数上限：fetchmany 只取前 N 行，防止百万行打爆内存
-4. 关键字黑名单：在 Pydantic 校验层（main.py 的 RunSQLArgs）
-
-注意：agent 场景的 SQL 是模型【生成】的，没法像传统 web 后端那样用参数化查询防注入，
-所以这里的防线是「只读 + 限制 + 校验」的纵深防御，而不是参数化。
-"""
+import asyncio
+import json
 import os
+import sys
+from contextlib import contextmanager
+from functools import lru_cache
+from sql_policy import BUSINESS_SCHEMA, SQLPolicyError, validate_sql
+
+if sys.platform == "win32":
+    asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
 MAX_ROWS = 1000
+MAX_RESULT_BYTES = 32000
 STATEMENT_TIMEOUT_MS = 5000
 
 
-def get_connection():
-    import psycopg  # 延迟导入：离线跑 Mock 时不需要装 psycopg
+def database_url() -> str:
+    return os.getenv(
+        "QUERY_DATABASE_URL",
+        "postgresql://sqlagent_reader:sqlagent_reader@localhost:5433/sqlagent",
+    )
 
-    dsn = os.environ.get(
-        "DATABASE_URL",
-        "postgresql://postgres:postgres@localhost:5433/sqlagent",
+
+@lru_cache(maxsize=1)
+def get_pool():
+    from psycopg_pool import ConnectionPool
+
+    return ConnectionPool(
+        database_url(),
+        min_size=0,
+        max_size=int(os.getenv("DB_POOL_SIZE", "8")),
+        timeout=5,
+        open=True,
+        kwargs={
+            "connect_timeout": 5,
+            "options": f"-c timezone=Asia/Shanghai -c search_path=pg_catalog,public -c default_transaction_read_only=on -c statement_timeout={STATEMENT_TIMEOUT_MS}",
+        },
     )
-    # 把「只读 + 超时」钉在连接层，任何走这个连接的代码都无法绕过
-    return psycopg.connect(
-        dsn,
-        # 连接层超时：连不上（比如数据库容器没起）就 5 秒报错，而不是无限挂起
-        connect_timeout=5,
-        options=(
-            "-c default_transaction_read_only=on "
-            f"-c statement_timeout={STATEMENT_TIMEOUT_MS}"
-        ),
-    )
+
+
+@contextmanager
+def get_connection():
+    with get_pool().connection() as conn:
+        yield conn
+
+
+def close_pool():
+    if get_pool.cache_info().currsize:
+        get_pool().close()
+        get_pool.cache_clear()
+
+
+def _error(exc: Exception) -> dict:
+    code = getattr(exc, "sqlstate", "") or ""
+    if isinstance(exc, SQLPolicyError) or code == "42501":
+        kind, retryable = "policy_denied", False
+    elif code == "57014":
+        kind, retryable = "query_timeout", False
+    elif code.startswith("42"):
+        kind, retryable = "invalid_query", True
+    else:
+        kind, retryable = "database_unavailable", False
+    return {"ok": False, "error": {"code": kind, "retryable": retryable}}
+
+
+def _payload(columns, rows, truncated=False):
+    return {"ok": True, "columns": columns, "rows": rows, "truncated": truncated}
+
+
+def _size(value):
+    return len(json.dumps(value, ensure_ascii=False, default=str).encode("utf-8"))
+
+
+def _fits(columns, rows):
+    return len(rows) <= MAX_ROWS and _size(_payload(columns, rows)) <= MAX_RESULT_BYTES
+
+
+def _finish(columns, rows, truncated):
+    result = _payload(columns, rows, truncated)
+    if _size(result) > MAX_RESULT_BYTES:
+        return {"ok": False, "error": {"code": "result_too_wide", "retryable": False}}
+    return result
+
+
+def execute_query(sql: str) -> dict:
+    try:
+        sql = validate_sql(sql)
+        # Server-side cursor avoids buffering an unbounded result in the client.
+        with get_connection() as conn, conn.cursor(name="sqlagent_result") as cur:
+            cur.execute(sql)
+            columns = [d.name for d in cur.description] if cur.description else []
+            rows, truncated = [], False
+            for row in cur:
+                candidate = rows + [list(row)]
+                if not _fits(columns, candidate):
+                    truncated = True
+                    break
+                rows = candidate
+            return _finish(columns, rows, truncated)
+    except Exception as exc:
+        return _error(exc)
 
 
 def run_sql(sql: str) -> str:
-    """执行一条查询，返回格式化文本结果。安全限制都在这里。"""
-    sql = sql.strip().rstrip(";")
-
-    # 把「可能出错的操作」整个包进 try，except 接住后返回友好提示给模型
-    try:
-        with get_connection() as conn, conn.cursor() as cur:
-            cur.execute(sql)
-            # 多取 1 行，用来判断是否被截断
-            rows = cur.fetchmany(MAX_ROWS + 1)
-            cols = [d.name for d in cur.description] if cur.description else []
-    except Exception as e:
-        return f"查询失败：{e}"
-
-    truncated = len(rows) > MAX_ROWS
-    if truncated:
-        rows = rows[:MAX_ROWS]
-
-    return _format_rows(cols, rows, truncated=truncated)
+    return json.dumps(execute_query(sql), ensure_ascii=False, default=str)
 
 
-def _format_rows(cols: list[str], rows: list, truncated: bool) -> str:
-    if not cols:
-        return "查询成功，但没有返回列（可能不是 SELECT 语句）"
-
-    header = " | ".join(cols)
-    lines = [header, "-" * len(header)]
-    for row in rows:
-        lines.append(" | ".join(str(v) for v in row))
-
-    lines.append(f"（共 {len(rows)} 行）")
-    if truncated:
-        lines.append(f"[!] 结果超过 {MAX_ROWS} 行已截断，请用更精确的 WHERE 条件缩小范围。")
-    return "\n".join(lines)
+_async_pool = None
 
 
-def get_schema() -> str:
-    """从 information_schema 动态读取表结构，返回给模型看的文本。
+async def open_async_pool():
+    global _async_pool
+    from psycopg_pool import AsyncConnectionPool
 
-    为什么动态读：表结构会变，硬编码会过时、让模型查错列；
-    表多了手写也不现实。启动时读一次，保证 prompt 里的 schema 永远最新。
-    """
-    sql = (
-        "SELECT table_name, column_name, data_type "
-        "FROM information_schema.columns "
-        "WHERE table_schema = 'public' "
-        "ORDER BY table_name, ordinal_position"
+    _async_pool = AsyncConnectionPool(
+        database_url(),
+        min_size=0,
+        max_size=int(os.getenv("DB_POOL_SIZE", "8")),
+        open=False,
+        timeout=5,
+        kwargs={
+            "connect_timeout": 5,
+            "options": f"-c timezone=Asia/Shanghai -c search_path=pg_catalog,public -c default_transaction_read_only=on -c statement_timeout={STATEMENT_TIMEOUT_MS}",
+        },
     )
-    with get_connection() as conn, conn.cursor() as cur:
-        cur.execute(sql)
-        rows = cur.fetchall()
+    await _async_pool.open()
 
-    tables: dict[str, list[str]] = {}
-    for table, column, dtype in rows:
-        tables.setdefault(table, []).append(f"{column} ({dtype})")
 
-    return "\n".join(f"- {t}({', '.join(cols)})" for t, cols in tables.items())
+async def close_async_pool():
+    global _async_pool
+    if _async_pool is not None:
+        await _async_pool.close()
+        _async_pool = None
+
+
+async def arun_sql(sql: str) -> str:
+    try:
+        sql = validate_sql(sql)
+        if _async_pool is None:
+            raise RuntimeError("async pool not open")
+        async with _async_pool.connection() as conn:
+            async with conn.cursor(name="sqlagent_result") as cur:
+                await cur.execute(sql)
+                columns = [d.name for d in cur.description] if cur.description else []
+                rows, truncated = [], False
+                async for row in cur:
+                    candidate = rows + [list(row)]
+                    if not _fits(columns, candidate):
+                        truncated = True
+                        break
+                    rows = candidate
+                return json.dumps(
+                    _finish(columns, rows, truncated), ensure_ascii=False, default=str
+                )
+    except asyncio.CancelledError:
+        # Psycopg async execution handles server cancellation before pool reuse.
+        raise
+    except Exception as exc:
+        return json.dumps(_error(exc), ensure_ascii=False)
 
 
 def execute_raw(sql: str) -> list[tuple]:
-    """执行查询，返回原始行（不格式化），供评测比对结果集用。"""
-    sql = sql.strip().rstrip(";")
+    result = execute_query(sql)
+    if not result["ok"] or result["truncated"]:
+        raise ValueError("Evaluation query failed or was truncated")
+    return [tuple(row) for row in result["rows"]]
+
+
+def get_schema() -> str:
+    """Only authorized metadata: column types/comments, primary keys and FK paths."""
+    tables = {}
     with get_connection() as conn, conn.cursor() as cur:
-        cur.execute(sql)
-        return cur.fetchall()
+        cur.execute(
+            "SELECT c.relname,a.attname,format_type(a.atttypid,a.atttypmod), "
+            "col_description(c.oid,a.attnum),obj_description(c.oid,'pg_class'), "
+            "EXISTS(SELECT 1 FROM pg_index i WHERE i.indrelid=c.oid AND i.indisprimary AND a.attnum=ANY(i.indkey)) "
+            "FROM pg_attribute a JOIN pg_class c ON c.oid=a.attrelid "
+            "JOIN pg_namespace n ON n.oid=c.relnamespace "
+            "WHERE n.nspname='public' AND c.relname=ANY(%s) AND a.attnum>0 AND NOT a.attisdropped "
+            "ORDER BY c.relname,a.attnum",
+            (list(BUSINESS_SCHEMA),),
+        )
+        comments = {}
+        for (
+            table,
+            column,
+            dtype,
+            column_comment,
+            table_comment,
+            primary,
+        ) in cur.fetchall():
+            if column not in BUSINESS_SCHEMA[table]:
+                continue
+            comment = (column_comment or "").replace("\n", " ")
+            detail = f"{column} ({dtype})" + (" PRIMARY KEY" if primary else "")
+            if comment:
+                detail += f" COMMENT={comment}"
+            tables.setdefault(table, []).append(detail)
+            comments[table] = (table_comment or "").replace("\n", " ")
+        cur.execute(
+            "SELECT src.relname,pg_get_constraintdef(k.oid) FROM pg_constraint k "
+            "JOIN pg_class src ON src.oid=k.conrelid JOIN pg_namespace n ON n.oid=src.relnamespace "
+            "JOIN pg_class dst ON dst.oid=k.confrelid JOIN pg_namespace dn ON dn.oid=dst.relnamespace "
+            "WHERE k.contype='f' AND n.nspname='public' AND dn.nspname='public' "
+            "AND src.relname=ANY(%s) AND dst.relname=ANY(%s)",
+            (list(BUSINESS_SCHEMA), list(BUSINESS_SCHEMA)),
+        )
+        foreign_keys = {}
+        for table, definition in cur.fetchall():
+            foreign_keys.setdefault(table, []).append(definition)
+    lines = []
+    for table, cols in tables.items():
+        line = f"- {table}({', '.join(cols)})"
+        if comments.get(table):
+            line += f" | COMMENT={comments[table]}"
+        if foreign_keys.get(table):
+            line += " | " + "; ".join(foreign_keys[table])
+        lines.append(line)
+    return "\n".join(lines)

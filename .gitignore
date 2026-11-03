@@ -21,3 +21,12 @@ trace.json
 .idea/
 .vscode/
 .DS_Store
+
+# V2.1 generated model/cache and measurement files
+.hf-cache/
+.ruff_cache/
+eval-results*.json
+benchmark-results*.json
+
+# V2.2 local conversation checkpoints
+.data/

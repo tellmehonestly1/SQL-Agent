@@ -9,3 +9,8 @@ langgraph
 langchain-postgres
 langchain-huggingface
 sentence-transformers
+
+sqlglot>=30.29,<31
+psycopg-pool>=3.2,<4
+mcp>=2.3,<3
+langgraph-checkpoint-sqlite>=3.1,<4

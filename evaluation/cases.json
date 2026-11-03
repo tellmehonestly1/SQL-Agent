@@ -1,0 +1,212 @@
+[
+  {
+    "id": "q01",
+    "category": "count",
+    "question": "用户总数是多少",
+    "reference_sql": "SELECT COUNT(*) FROM users",
+    "ordered": false
+  },
+  {
+    "id": "q02",
+    "category": "count",
+    "question": "订单总数是多少",
+    "reference_sql": "SELECT COUNT(*) FROM orders",
+    "ordered": false
+  },
+  {
+    "id": "q03",
+    "category": "aggregate",
+    "question": "最高订单金额是多少",
+    "reference_sql": "SELECT MAX(amount) FROM orders",
+    "ordered": false
+  },
+  {
+    "id": "q04",
+    "category": "aggregate",
+    "question": "最低订单金额是多少",
+    "reference_sql": "SELECT MIN(amount) FROM orders",
+    "ordered": false
+  },
+  {
+    "id": "q05",
+    "category": "aggregate",
+    "question": "全部订单总额是多少",
+    "reference_sql": "SELECT SUM(amount) FROM orders",
+    "ordered": false
+  },
+  {
+    "id": "q06",
+    "category": "aggregate",
+    "question": "平均订单金额是多少",
+    "reference_sql": "SELECT AVG(amount) FROM orders",
+    "ordered": false
+  },
+  {
+    "id": "q07",
+    "category": "join",
+    "question": "李四的订单总额是多少",
+    "reference_sql": "SELECT SUM(o.amount) FROM orders o JOIN users u ON u.id=o.user_id WHERE u.name='李四'",
+    "ordered": false
+  },
+  {
+    "id": "q08",
+    "category": "join",
+    "question": "王五有几笔订单",
+    "reference_sql": "SELECT COUNT(*) FROM orders o JOIN users u ON u.id=o.user_id WHERE u.name='王五'",
+    "ordered": false
+  },
+  {
+    "id": "q09",
+    "category": "group",
+    "question": "每个用户的ID和订单总额，包括没有订单的用户",
+    "reference_sql": "SELECT u.id,COALESCE(SUM(o.amount),0) FROM users u LEFT JOIN orders o ON u.id=o.user_id GROUP BY u.id",
+    "ordered": false
+  },
+  {
+    "id": "q10",
+    "category": "group",
+    "question": "每个用户ID对应的订单数量，包括没有订单的用户",
+    "reference_sql": "SELECT u.id,COUNT(o.id) FROM users u LEFT JOIN orders o ON u.id=o.user_id GROUP BY u.id",
+    "ordered": false
+  },
+  {
+    "id": "q11",
+    "category": "empty",
+    "question": "名字叫不存在的用户的ID",
+    "reference_sql": "SELECT id FROM users WHERE name='不存在'",
+    "ordered": false
+  },
+  {
+    "id": "q12",
+    "category": "empty",
+    "question": "金额超过10000的订单ID",
+    "reference_sql": "SELECT id FROM orders WHERE amount>10000",
+    "ordered": false
+  },
+  {
+    "id": "q13",
+    "category": "null",
+    "question": "名字叫不存在的用户的订单总额",
+    "reference_sql": "SELECT SUM(o.amount) FROM orders o JOIN users u ON u.id=o.user_id WHERE u.name='不存在'",
+    "ordered": false
+  },
+  {
+    "id": "q14",
+    "category": "filter",
+    "question": "金额大于100的订单ID",
+    "reference_sql": "SELECT id FROM orders WHERE amount>100",
+    "ordered": false
+  },
+  {
+    "id": "q15",
+    "category": "filter",
+    "question": "金额等于0的订单ID",
+    "reference_sql": "SELECT id FROM orders WHERE amount=0",
+    "ordered": false
+  },
+  {
+    "id": "q16",
+    "category": "filter",
+    "question": "金额在30到100之间的订单ID，包含端点",
+    "reference_sql": "SELECT id FROM orders WHERE amount BETWEEN 30 AND 100",
+    "ordered": false
+  },
+  {
+    "id": "q17",
+    "category": "time",
+    "question": "2026年1月的订单总额",
+    "reference_sql": "SELECT SUM(amount) FROM orders WHERE created_at>='2026-01-01' AND created_at<'2026-02-01'",
+    "ordered": false
+  },
+  {
+    "id": "q18",
+    "category": "time",
+    "question": "2026年2月订单数量",
+    "reference_sql": "SELECT COUNT(*) FROM orders WHERE created_at>='2026-02-01' AND created_at<'2026-03-01'",
+    "ordered": false
+  },
+  {
+    "id": "q19",
+    "category": "time",
+    "question": "2026年3月1日及以后的订单ID",
+    "reference_sql": "SELECT id FROM orders WHERE created_at>='2026-03-01'",
+    "ordered": false
+  },
+  {
+    "id": "q20",
+    "category": "duplicates",
+    "question": "所有用户的姓名，保留重名",
+    "reference_sql": "SELECT name FROM users",
+    "ordered": false
+  },
+  {
+    "id": "q21",
+    "category": "duplicates",
+    "question": "所有不重复的用户姓名",
+    "reference_sql": "SELECT DISTINCT name FROM users",
+    "ordered": false
+  },
+  {
+    "id": "q22",
+    "category": "identity",
+    "question": "姓名相同但ID不同的用户分别有多少订单，返回ID和数量",
+    "reference_sql": "SELECT u.id,COUNT(o.id) FROM users u LEFT JOIN orders o ON u.id=o.user_id WHERE u.name='同名用户' GROUP BY u.id",
+    "ordered": false
+  },
+  {
+    "id": "q23",
+    "category": "having",
+    "question": "订单总额大于100的用户ID和总额",
+    "reference_sql": "SELECT user_id,SUM(amount) FROM orders GROUP BY user_id HAVING SUM(amount)>100",
+    "ordered": false
+  },
+  {
+    "id": "q24",
+    "category": "having",
+    "question": "至少有两笔订单的用户ID和订单数",
+    "reference_sql": "SELECT user_id,COUNT(*) FROM orders GROUP BY user_id HAVING COUNT(*)>=2",
+    "ordered": false
+  },
+  {
+    "id": "q25",
+    "category": "anti_join",
+    "question": "没有订单的用户ID",
+    "reference_sql": "SELECT u.id FROM users u LEFT JOIN orders o ON u.id=o.user_id WHERE o.id IS NULL",
+    "ordered": false
+  },
+  {
+    "id": "q26",
+    "category": "subquery",
+    "question": "订单金额高于平均值的订单ID",
+    "reference_sql": "SELECT id FROM orders WHERE amount>(SELECT AVG(amount) FROM orders)",
+    "ordered": false
+  },
+  {
+    "id": "q27",
+    "category": "cte",
+    "question": "用CTE计算每个有订单用户的ID和总金额",
+    "reference_sql": "WITH totals AS (SELECT user_id,SUM(amount) AS total FROM orders GROUP BY user_id) SELECT user_id,total FROM totals",
+    "ordered": false
+  },
+  {
+    "id": "q28",
+    "category": "sort",
+    "question": "金额最高的三笔订单的ID和金额，金额降序，同金额按ID升序",
+    "reference_sql": "SELECT id,amount FROM orders ORDER BY amount DESC,id LIMIT 3",
+    "ordered": true
+  },
+  {
+    "id": "q29",
+    "category": "sort",
+    "question": "按ID升序列出所有用户ID和姓名",
+    "reference_sql": "SELECT id,name FROM users ORDER BY id",
+    "ordered": true
+  },
+  {
+    "id": "q30",
+    "category": "join",
+    "question": "张三的每笔订单ID和金额",
+    "reference_sql": "SELECT o.id,o.amount FROM orders o JOIN users u ON u.id=o.user_id WHERE u.name='张三'",
+    "ordered": false
+  }
+]

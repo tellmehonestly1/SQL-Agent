@@ -1,0 +1,125 @@
+[
+  {
+    "id": "revenue_clarify_and_rank",
+    "turns": [
+      {
+        "request": {
+          "question": "销售额是多少"
+        },
+        "expected_status": "clarification_required",
+        "expected_fields": [
+          "metric_id",
+          "period"
+        ]
+      },
+      {
+        "request": {
+          "question": "按订单金额，统计2026年1月",
+          "metric_id": "order_amount",
+          "date_range": {
+            "start": "2026-01-01",
+            "end": "2026-02-01"
+          }
+        },
+        "expected_status": "completed",
+        "reference_sql": "SELECT SUM(amount) FROM orders WHERE created_at>='2026-01-01' AND created_at<'2026-02-01'"
+      },
+      {
+        "request": {
+          "question": "按用户ID排名，金额降序，同金额按用户ID升序"
+        },
+        "expected_status": "completed",
+        "ordered": true,
+        "reference_sql": "SELECT user_id,SUM(amount) total FROM orders WHERE created_at>='2026-01-01' AND created_at<'2026-02-01' GROUP BY user_id ORDER BY total DESC,user_id"
+      }
+    ]
+  },
+  {
+    "id": "unsupported_paid_revenue",
+    "turns": [
+      {
+        "request": {
+          "question": "已支付收入是多少"
+        },
+        "expected_status": "clarification_required",
+        "expected_fields": [
+          "metric_id",
+          "period"
+        ]
+      },
+      {
+        "request": {
+          "question": "改用订单金额，全部时间",
+          "metric_id": "order_amount",
+          "period": "all_time"
+        },
+        "expected_status": "completed",
+        "reference_sql": "SELECT SUM(amount) FROM orders"
+      }
+    ]
+  },
+  {
+    "id": "active_definition",
+    "turns": [
+      {
+        "request": {
+          "question": "最近活跃用户有多少"
+        },
+        "expected_status": "clarification_required",
+        "expected_fields": [
+          "metric_id",
+          "period"
+        ]
+      },
+      {
+        "request": {
+          "question": "按下单用户，统计2026年1月",
+          "metric_id": "ordering_users",
+          "date_range": {
+            "start": "2026-01-01",
+            "end": "2026-02-01"
+          }
+        },
+        "expected_status": "completed",
+        "reference_sql": "SELECT COUNT(DISTINCT user_id) FROM orders WHERE created_at>='2026-01-01' AND created_at<'2026-02-01'"
+      }
+    ]
+  },
+  {
+    "id": "change_user_time_scope",
+    "turns": [
+      {
+        "request": {
+          "question": "用户总数是多少"
+        },
+        "expected_status": "completed",
+        "reference_sql": "SELECT COUNT(*) FROM users"
+      },
+      {
+        "request": {
+          "question": "只看2026年2月创建的用户",
+          "date_range": {
+            "start": "2026-02-01",
+            "end": "2026-03-01"
+          }
+        },
+        "expected_status": "completed",
+        "reference_sql": "SELECT COUNT(*) FROM users WHERE created_at>='2026-02-01' AND created_at<'2026-03-01'"
+      }
+    ]
+  },
+  {
+    "id": "followup_without_context",
+    "turns": [
+      {
+        "request": {
+          "question": "只看上个月"
+        },
+        "expected_status": "clarification_required",
+        "expected_fields": [
+          "question"
+        ]
+      }
+    ]
+  }
+]
